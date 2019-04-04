@@ -112,6 +112,7 @@ namespace WindowsShutdown
             {
                 case PowerModes.Resume:
                     _vm = XmlHelper.ReadConfig(CONFIGPATH);
+                    this.DataContext = _vm;
                     if (_vm.Dayly)
                     {
                         ButtonStart_Click(new Button(), null);
@@ -121,9 +122,6 @@ namespace WindowsShutdown
                         }
                     }
                     break;
-                //case PowerModes.Suspend:
-                //    ni.Visible = false;
-                //    break;
                 default: break;
             }
         }
