@@ -118,7 +118,11 @@
   <ItemGroup>
     <None Include="Setup.ico" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Resource Include="Config.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+  </ItemGroup>
   <ItemGroup>
     <Resource Include="Resources\exit_17902.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

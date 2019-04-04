@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace WindowsShutdown
 {
@@ -17,21 +18,18 @@ namespace WindowsShutdown
     {
         const string CONFIGPATH = "Config.xml";
         ViewModel _vm;
-        DateTime _startTime;
         System.Timers.Timer secondsTimer;
         System.Windows.Forms.NotifyIcon ni;
+
         public MainWindow()
         {
-
             CloseIfAlreadyRunning();
             InitializeComponent();
             _vm = XmlHelper.ReadConfig(CONFIGPATH);
-            XmlHelper.SaveConfig(_vm, CONFIGPATH);
-            _vm = XmlHelper.ReadConfig(CONFIGPATH);
-                        
-            CB_Mode.ItemsSource = Enum.GetValues(typeof(WindowsShutdownMode));
-            this.DataContext = _vm;
             _vm.TimeRemainingVisibility = Visibility.Hidden;
+            CB_Mode.ItemsSource = Enum.GetValues(typeof(WindowsShutdownMode));
+
+            this.DataContext = _vm;
             DP_ShutdownDate.DisplayDateStart = DateTime.Now.Date;
 
 
@@ -58,26 +56,6 @@ namespace WindowsShutdown
         }
 
         #region Events
-        private void OnPowerChange(object s, PowerModeChangedEventArgs e)
-        {
-            switch (e.Mode)
-            {
-                case PowerModes.Resume:
-                    _vm=XmlHelper.ReadConfig(CONFIGPATH);
-                    if (_vm.Dayly)
-                    {
-                        ButtonStart_Click(new Button(), null);
-                        ni.Visible = true;
-                        _vm.TimeRemainingVisibility = Visibility.Hidden;
-                        _vm.TimeRemainingVisibility = Visibility.Visible;
-                    }
-                    break;
-                //case PowerModes.Suspend:
-                //    ni.Visible = false;
-                //    break;
-                default: break;
-            }
-        }
 
         private void TrayIcon_MouseClick(object sender, System.Windows.Forms.MouseEventArgs e)
         {
@@ -98,7 +76,7 @@ namespace WindowsShutdown
 
         private void T_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            _vm.TimeRemainingVisibility = Visibility.Collapsed;
+            //_vm.TimeRemainingVisibility = Visibility.Collapsed;
             try
             {
                 _vm.TimeToShutdown = new DateTime() + (_vm.DisplayOnlyShutdownDate - DateTime.Now);
@@ -123,31 +101,56 @@ namespace WindowsShutdown
 
                 }
 
-                _vm.TimeRemainingVisibility = Visibility.Visible;
+                //_vm.TimeRemainingVisibility = Visibility.Visible;
             }
 
         }
 
+        private void OnPowerChange(object s, PowerModeChangedEventArgs e)
+        {
+            switch (e.Mode)
+            {
+                case PowerModes.Resume:
+                    _vm = XmlHelper.ReadConfig(CONFIGPATH);
+                    if (_vm.Dayly)
+                    {
+                        ButtonStart_Click(new Button(), null);
+                        if (!ni.Visible)
+                        {
+                            ni.Visible = true;
+                        }
+                    }
+                    break;
+                //case PowerModes.Suspend:
+                //    ni.Visible = false;
+                //    break;
+                default: break;
+            }
+        }
         private void ButtonStart_Click(object sender, RoutedEventArgs e)
         {
             Button startButton = (Button)sender;
-            if (!secondsTimer.Enabled)
+
+            if (!_vm.RunCountdown)
             {
-                StartTimer(startButton);
+                SetShutdownTime(startButton);
             }
             else
             {
                 if (MessageBox.Show("Ein Shutdown Timer läuft bereits.\r\nWollen sie wirklich einen neuen starten?",
-                    "Timer läuft bereits",MessageBoxButton.YesNo,MessageBoxImage.Warning,MessageBoxResult.Yes)==MessageBoxResult.Yes)
+                    "Timer läuft bereits", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.Yes) == MessageBoxResult.Yes)
                 {
-                    StartTimer(startButton);
-                }                
+                    _vm.RunCountdown = false;
+                    SetShutdownTime(startButton);
+
+                }
             }
         }
 
         private void ButtonStop_Click(object sender, RoutedEventArgs e)
         {
-            _vm.TimeRemainingVisibility = Visibility.Collapsed;
+            _vm.RunCountdown = false;
+            //_vm.TimeRemainingVisibility = Visibility.Collapsed;
             secondsTimer.Stop();
         }
 
@@ -162,17 +165,18 @@ namespace WindowsShutdown
             if (this.WindowState == WindowState.Minimized)
             {
                 this.Hide();
-                ni.Visible = true;
+                if (!ni.Visible)
+                {
+                    ni.Visible = true;
+                }
             }
         }
-
         #endregion
 
         #region Methods
-
-        private void StartTimer(Button startButton)
+           
+        private void SetShutdownTime(Button startButton)
         {
-            _startTime = DateTime.Now;
             _vm.DisplayOnlyShutdownDate = DateTime.Now;
             if (startButton.Name == "B_StartTimer")
             {
@@ -199,15 +203,49 @@ namespace WindowsShutdown
                     _vm.DisplayOnlyShutdownDate = _vm.DisplayOnlyShutdownDate.AddDays(1);
                 }
             }
-            secondsTimer.Start();
-            _vm.TimeRemainingVisibility = Visibility.Visible;
+
+            Task.Run(async ()=>
+            {  
+                await Task.Delay(1000);
+                StartCountdown();
+            });
+
+        }
+        private void StartCountdown()
+        {
+
+            _vm.RunCountdown = true;
+            Task.Run(async ()=>
+            {
+                while (_vm.DisplayOnlyShutdownDate > DateTime.Now && _vm.RunCountdown)
+                {
+                    _vm.TimeToShutdown = DateTime.Today + (_vm.DisplayOnlyShutdownDate - DateTime.Now);
+                    ni.Text = $"Time until {Enum.GetName(typeof(WindowsShutdownMode), _vm.ShutdownMode)}: {_vm.TimeToShutdown.ToString("HH:mm:ss")}";
+                    int remaining = Convert.ToInt32((_vm.DisplayOnlyShutdownDate - DateTime.Now).TotalSeconds);                    
+                    if (remaining == 300)
+                    {
+                        Task.Run(() =>
+                        {
+                            MessageBox.Show($"5 min remaining");
+                        });
+                    }
+                    await Task.Delay(1000);
+                }
+
+                if (_vm.RunCountdown)
+                {
+                    InitiateShutdown();
+                }
+
+            }
+            );
+
         }
         private void InitiateShutdown()
         {
-            ButtonStop_Click(null, null);
+            _vm.RunCountdown = false;
+            //ButtonStop_Click(null, null);
             XmlHelper.SaveConfig(_vm, CONFIGPATH);
-
-            Thread.Sleep(500);
 
             switch (_vm.ShutdownMode)
             {
@@ -220,10 +258,7 @@ namespace WindowsShutdown
 
         }
 
-        /// <summary>
-        /// Sets the outputstring for the remaining time until Shutdown
-        /// </summary>
-
+        
         public void CloseIfAlreadyRunning()
         {
             var appProcess = Process.GetProcessesByName(System.Diagnostics.Process.GetCurrentProcess().ProcessName);

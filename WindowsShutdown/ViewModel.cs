@@ -67,6 +67,25 @@ namespace WindowsShutdown
             }
         }
 
+        private bool _runCountdown;
+        public bool RunCountdown
+        {
+            get { return _runCountdown; }
+            set
+            {
+                _runCountdown = value;
+                PropertyChanged(this, new PropertyChangedEventArgs(nameof(RunCountdown)));
+                if (RunCountdown)
+                {
+                    TimeRemainingVisibility = Visibility.Visible;
+                }
+                else
+                {
+                    TimeRemainingVisibility = Visibility.Hidden;
+                }
+            }
+        }
+
         private Visibility _timeRemainingVisibility;
         public Visibility TimeRemainingVisibility
         {

@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Config>
+  <Mode>Suspend</Mode>
+  <ShutdownTimer>00:20:00</ShutdownTimer>
+  <ShutdownTime>03/04/2019 07:57:00</ShutdownTime>
+  <Dayly>True</Dayly>
+</Config>
